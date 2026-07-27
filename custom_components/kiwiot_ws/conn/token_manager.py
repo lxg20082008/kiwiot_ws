@@ -44,7 +44,7 @@ class TokenManager:
                         self._refresh_token = data.get("refresh_token")
                         self._expires_at = data.get("expires_at")
                         self._token_type = data.get("token_type", "bearer")
-                        _LOGGER.info(f"已从{self._storage_file}存储加载Token信息:{data}")
+                        _LOGGER.info(f"已从{self._storage_file}存储加载Token信息")
         except Exception as e:
             _LOGGER.error(f"加载Token存储失败: {e}")
 
@@ -103,31 +103,16 @@ class TokenManager:
                     if await self.is_token_valid(session):
                         _LOGGER.info(f"使用缓存的token, 过期时间: {datetime.fromtimestamp(self._expires_at)}")
                         return self._access_token
-                    elif not await self.is_token_valid(session):
+                    else:
                         _LOGGER.warning("Token无效")
                         await self._fetch_new_token(session)
-                        _LOGGER.warning(f"{self._access_token}使用新token, 过期时间: {datetime.fromtimestamp(self._expires_at)}")
-                        return self._access_token
-                    else:
-                        _LOGGER.warning("未知错误")
-                        await self._fetch_new_token(session)
-                        _LOGGER.warning(f"{self._access_token}使用新token, 过期时间: {datetime.fromtimestamp(self._expires_at)}")
+                        _LOGGER.warning(f"{self._access_token[:8]}... 使用新token, 过期时间: {datetime.fromtimestamp(self._expires_at)}")
                         return self._access_token
                 else:
-                    _LOGGER.warning(f"Token：{self._access_token} 已过期")
+                    _LOGGER.warning(f"Token：{self._access_token[:8]}... 已过期")
                     await self._fetch_new_token(session)
-                    _LOGGER.warning(f"token已刷新：{self._access_token}, 过期时间: {datetime.fromtimestamp(self._expires_at)}")
+                    _LOGGER.warning(f"token已刷新：{self._access_token[:8]}..., 过期时间: {datetime.fromtimestamp(self._expires_at)}")
                     return self._access_token
-
-                # if self._refresh_token:
-                #     try:
-                #         _LOGGER.debug("尝试使用refresh_token刷新")
-                #         await self._refresh_access_token(session)
-                #         return self._access_token
-                #     except Exception as e:
-                #         _LOGGER.warning(f"刷新token失败: {e}")
-
-                # _LOGGER.info("获取新token")
 
             except Exception as e:
                 _LOGGER.error(f"获取token失败: {e}")
@@ -207,7 +192,7 @@ class TokenManager:
         self._refresh_token = token_data.get("refresh_token")
         self._token_type = token_data.get("token_type", "secure")
         expires_in = int(token_data.get("expires_in", 3600))
-        self._expires_at = time.time() + expires_in - 300
+        self._expires_at = time.time() + expires_in
 
         await self._save_tokens()
 
