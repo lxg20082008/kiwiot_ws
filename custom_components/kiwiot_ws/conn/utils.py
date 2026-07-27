@@ -1,253 +1,175 @@
-﻿import logging
 import aiohttp
-import aiofiles
-import asyncio
-from datetime import datetime
-from typing import List, Dict, Optional
-from pathlib import Path
-import hashlib
-from PIL import Image
-from io import BytesIO
-from concurrent.futures import ThreadPoolExecutor
-import os
+import logging
+from ..const import BASE_URL, LOGGER_NAME, DOMAIN
+from .token_manager import TokenManager
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(f"{LOGGER_NAME}_{__name__}")
 
-async def get_latest_event(events: List[Dict]) -> Optional[Dict]:
-    """获取最新的事件."""
+async def _make_request(hass, session, url, error_prefix="获取信息"):
+    
     try:
-        if not events:
-            return None
-            
-        sorted_events = sorted(
-            events,
-            key=lambda x: datetime.fromisoformat(x.get("created_at", "").replace('Z', '+00:00')),
-            reverse=True
-        )
-        
-        latest_event = sorted_events[0]
-        _LOGGER.debug(f"最新事件: {latest_event}")
-        
-        return latest_event
-        
+        async with session.get(url) as response:
+            if response.status == 200:
+                return await response.json()
+            else:
+                _LOGGER.error(f"{error_prefix}失败: 状态码 {response.status}")
+                response.raise_for_status()
+    except aiohttp.ClientError as e:
+        _LOGGER.error(f"在{error_prefix}时发生错误: {e}")
+        return None
     except Exception as e:
-        _LOGGER.error(f"获取最新事件失败: {e}")
+        _LOGGER.error(f"发生意外错误: {e}")
         return None
 
-async def get_latest_event_with_data(events: List[Dict]) -> Optional[Dict]:
-    """获取最近一次包含data的事件."""
+async def get_ggid(hass, entry, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/restapi/groups?access_token={token}"
+    return await _make_request(hass, session, url, "获取组信息")
+
+async def get_ddevices(hass, entry, gid, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/restapi/groups/{gid}/devices?access_token={token}"
+    return await _make_request(hass, session, url, "获取设备信息")
+
+async def get_user_info(hass, entry, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/restapi/user?access_token={token}"
+    return await _make_request(hass, session, url, "获取用户信息")
+async def get_device_info(hass, entry, did, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/api/devices/{did}?access_token={token}"
+    return await _make_request(hass, session, url, "获取设备信息")
+
+async def get_llock_userinfo(hass, entry, did, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/api/locks/{did}/users?access_token={token}"
+    return await _make_request(hass, session, url, "获取锁用户信息")
+
+async def get_llock_info(hass, entry, did, session):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/api/devices/{did}/events?page=1&per_page=15&access_token={token}"
+    return await _make_request(hass, session, url, "获取锁信息")
+
+async def get_llock_video(hass, entry, did, session, stream_id):
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    url = f"{BASE_URL}/api/devices/{did}/streams/{stream_id}?page=1&per_page=15&access_token={token}"
+    return await _make_request(hass, session, url, "获取锁信息")
+
+async def update_lock_user_alias(hass, entry, did, user_type, user_id, new_alias, session):
+    """更新锁用户别名"""
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    if len(new_alias) > 16:
+        _LOGGER.error("用户别名长度不能超过16个字符")
+        return False
+        
+    _LOGGER.debug(f"更新用户别名: {new_alias}")
+    url = f"{BASE_URL}/api/locks/{did}/users/{user_type}/{user_id}/alias"
+    
     try:
-        if not events:
-            return None
-            
-        sorted_events = sorted(
-            events,
-            key=lambda x: datetime.fromisoformat(x.get("created_at", "").replace('Z', '+00:00')),
-            reverse=True
-        )
-        
-        for event in sorted_events:
-            if (event.get("data") and 
-                isinstance(event["data"], dict) and 
-                len(event["data"]) > 0):
-                _LOGGER.debug(f"找到最近的data事件: {event}")
-                return event
-                
-        return None
-        
-    except Exception as e:
-        _LOGGER.error(f"获取最近data事件失败: {e}")
-        return None
-    
-async def get_history_events(events: List[Dict]) -> List[Dict]:
-    """获取除最新事件外的所有事件."""
-    try:
-        if not events or len(events) <= 1:
-            return []
-            
-        sorted_events = sorted(
-            events,
-            key=lambda x: datetime.fromisoformat(x.get("created_at", "").replace('Z', '+00:00')),
-            reverse=True
-        )
-        
-        history_events = sorted_events[1:]
-        _LOGGER.debug(f"历史事件数量: {len(history_events)}")
-        
-        return history_events
-        
-    except Exception as e:
-        _LOGGER.error(f"获取历史事件失败: {e}")
-        return []
-    
-    
-async def convert_wsevent_format(event_data: dict) -> dict:
-    USER_TYPE_MAP = {
-        0: "门内", 
-        1: "FINGERPRINT",
-        2: "PASSWORD",
-        3: "CARD",
-        5: "远程",
-        6: "FACE",
-        7: "掌纹",
-        9: "临时密码"
-    } 
-    
-    data = event_data.get("data", {})
-    if not data:
-        formatted_data = {}
-    else:
-        formatted_data = {
-            "image": {
-                "uri": data.get("image_uri")
-            },
-            "lock_user": {
-                "id": data.get("lock_user", {}).get("id"),
-                "type": USER_TYPE_MAP.get(
-                    data.get("lock_user", {}).get("type"),
-                    "UNKNOWN"
-                )
-            }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {token}"
         }
+        
+        async with session.put(url, json=new_alias, headers=headers) as response:
+            if response.status == 204:
+                _LOGGER.info(f"成功更新用户别名为: {new_alias}")
+                return True
+            else:
+                try:
+                    error_data = await response.json()
+                    _LOGGER.error(f"更新用户别名失败: 状态码 {response.status}, 错误信息: {error_data}")
+                except:
+                    _LOGGER.error(f"更新用户别名失败: 状态码 {response.status}")
+                return False
+                
+    except aiohttp.ClientError as e:
+        _LOGGER.error(f"更新用户别名时发生错误: {e}")
+        return False
+    except Exception as e:
+        _LOGGER.error(f"发生意外错误: {e}")
+        return False
+    
+async def create_mfa_token(hass, entry, uid, number, session):
+    """开锁"""
+    token_manager = TokenManager(hass, entry)
+    token = await token_manager.get_token(session)
+    domain_data = hass.data.get(DOMAIN, {})
+    client_id = domain_data.get("client_id")
+    _LOGGER.info(f"创建MFA Token: {domain_data}")
 
-    converted_data = {
-        "device_id": event_data.get("did"),
-        "name": event_data.get("name"),
-        "level": event_data.get("level"),
-        "created_at": event_data.get("created_at"),
-        "data": formatted_data
+    if len(number) > 6:
+        _LOGGER.error("密码长度不能超过6个字符")
+        return False
+
+    url = f"{BASE_URL}/restapi/users/{uid}/mfa/tokens"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {token}",
+        "x-kiwik-client-id": f"{client_id}"
     }
 
-    return converted_data
+    payload = {
+        "auth_type": "secure_password",
+        "credential": number
+    }
 
-async def convert_media_event_format(event_data: dict) -> dict:
     try:
-        formatted_data = {
-            "image": {
-                "uri": event_data.get("data", {}).get("image_uri")
-            },
-            "lock_user": {
-                "id": "UNKNOWN",
-                "type": "UNKNOWN"
+        async with session.post(url, json=payload, headers=headers) as response:
+            try:
+                response_data = await response.json()
+                _LOGGER.info(f"完整响应JSON: {response_data}")
+            except aiohttp.ContentTypeError:
+                _LOGGER.error("响应不是有效的JSON格式")
+                return None
+            except Exception as e:
+                _LOGGER.error(f"JSON解析异常: {e}")
+                return None
+
+            if response.status == 201:
+                if isinstance(response_data, dict):
+                    if "access_token" in response_data:
+                        _LOGGER.info("开锁凭证获取成功")
+                        return {
+                            "success": True,
+                            "data": response_data
+                        }
+                    _LOGGER.error("响应缺少access_token字段")
+                else:
+                    _LOGGER.error("响应数据结构异常")
+                return {"success": False}
+
+            error_info = {
+                "status": response.status,
+                "message": "未知错误"
             }
-        }
-        
-        if "data" in event_data and "media" in event_data["data"]:
-            formatted_data["media"] = event_data["data"]["media"]
             
-        if "data" in event_data and "stream_id" in event_data["data"]:
-            formatted_data["stream_id"] = event_data["data"]["stream_id"]
-
-        converted_data = {
-            "device_id": event_data.get("did"),
-            "name": event_data.get("name"),
-            "level": event_data.get("level"),
-            "created_at": event_data.get("created_at"),
-            "data": formatted_data
-        }
-        
-        return converted_data
-        
+            if isinstance(response_data, dict):
+                error_info.update({
+                    "code": response_data.get("code"),
+                    "message": response_data.get("message", "未知错误"),
+                    "details": response_data.get("details")
+                })
+                
+            _LOGGER.error(f"请求失败 [{error_info['status']}]: {error_info['message']}")
+            return {
+                "success": False,
+                "error": error_info
+            }
+            
+    except aiohttp.ClientError as e:
+        _LOGGER.error(f"网络请求失败: {str(e)}")
+        return {"success": False, "error": str(e)}
     except Exception as e:
-        _LOGGER.error(f"转换媒体事件数据失败: {e}")
-        return None
+        _LOGGER.error(f"未处理异常: {str(e)}", exc_info=True)
+        return {"success": False, "error": "系统内部错误"}
 
-class ImageCache:
-    def __init__(self, hass, cache_dir: Path):
-        self.hass = hass
-        self._cache_dir = cache_dir
-        self._cache_dir.mkdir(parents=True, exist_ok=True)
-        self._current_image_url = None
-        self._current_cache_file = None
-        self._executor = ThreadPoolExecutor(max_workers=2)
-        self._max_cache_files = 10
-        self._downloading = False
 
-    async def _cleanup_old_cache(self):
-        """清理旧的缓存文件，只保留最近的10个文件"""
-        try:
-            cache_files = sorted(
-                [f for f in self._cache_dir.glob("*.jpg")],
-                key=lambda x: x.stat().st_mtime,
-                reverse=True
-            )
-            
-            if len(cache_files) > self._max_cache_files:
-                for old_file in cache_files[self._max_cache_files:]:
-                    try:
-                        old_file.unlink()
-                        _LOGGER.debug(f"删除旧缓存文件: {old_file}")
-                    except Exception as e:
-                        _LOGGER.error(f"删除缓存文件失败: {e}")
-
-        except Exception as e:
-            _LOGGER.error(f"清理缓存文件失败: {e}")
-
-    async def _save_image_to_file(self, image: Image.Image, cache_file: Path) -> None:
-        def _save():
-            image.save(cache_file, format="JPEG")
-        
-        await self.hass.async_add_executor_job(_save)
-        await self._cleanup_old_cache()  
-    def _get_cache_filename(self, url: str) -> str:
-        _LOGGER.info( "保存文件：" + hashlib.md5(url.encode()).hexdigest() + ".jpg")
-        return hashlib.md5(url.encode()).hexdigest() + ".jpg"
-
-    async def _read_file_bytes(self, cache_file: Path) -> bytes:
-        async with aiofiles.open(cache_file, mode='rb') as file:
-            return await file.read()
-
-    async def clear_cache(self) -> None:
-        if self._current_cache_file and os.path.exists(self._current_cache_file):
-            try:
-                os.remove(self._current_cache_file)
-                self._current_image_url = None
-                self._current_cache_file = None
-            except Exception as e:
-                _LOGGER.error(f"清除缓存文件失败: {e}")
-
-    async def get_image(self, url: str) -> Optional[bytes]:
-        """获取图片，支持缓存和预下载"""
-        if not url:
-            return None
-
-        cache_file = self._cache_dir / self._get_cache_filename(url)
-        
-        if self._current_image_url == url and cache_file.exists():
-            try:
-                _LOGGER.debug(f"使用缓存图片: {cache_file}")
-                return await self._read_file_bytes(cache_file)
-            except Exception as e:
-                _LOGGER.error(f"读取缓存图片失败: {e}")
-
-        while self._downloading:
-            await asyncio.sleep(0.1)
-
-        try:
-            self._downloading = True
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as response:
-                    if response.status != 200:
-                        _LOGGER.error(f"下载图片失败: HTTP {response.status}")
-                        return None
-
-                    image_data = await response.read()
-                    
-                    def process_image():
-                        image = Image.open(BytesIO(image_data))
-                        return image.rotate(-90, expand=True)
-                    
-                    rotated_image = await self.hass.async_add_executor_job(process_image)
-                    await self._save_image_to_file(rotated_image, cache_file)
-                    
-                    self._current_image_url = url
-                    self._current_cache_file = cache_file
-                    
-                    _LOGGER.debug(f"图片已下载并缓存: {url}")
-                    return await self._read_file_bytes(cache_file)
-
-        except Exception as e:
-            _LOGGER.error(f"处理图片失败: {e}")
-            return None
-        finally:
-            self._downloading = False
