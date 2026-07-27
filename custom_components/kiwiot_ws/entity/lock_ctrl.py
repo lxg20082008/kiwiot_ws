@@ -140,6 +140,12 @@ class KiwiLockPasswordConfirm(ButtonEntity):
         self._last_press_time = None
         self.async_write_ha_state()
 
+    async def async_will_remove_from_hass(self) -> None:
+        """实体移除时取消定时器"""
+        if self._update_timer:
+            self._update_timer.cancel()
+            self._update_timer = None
+
     @property
     def icon(self):
         return "mdi:lock-open-check"

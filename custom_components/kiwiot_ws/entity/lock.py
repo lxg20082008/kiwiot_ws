@@ -400,18 +400,25 @@ class KiwiLockCamera(Camera):
         if self._video_info and "media" in self._video_info and "uri" in self._video_info["media"]:
             url = self._video_info["media"]["uri"]
             _LOGGER.debug(f"使用视频信息URL: {url}")
-        elif (self._event_data and 
-              "data" in self._event_data and 
-              "image" in self._event_data["data"] and 
-              "uri" in self._event_data["data"]["image"]):
-            url = self._event_data["data"]["image"]["uri"]
-            _LOGGER.debug(f"使用事件数据URL: {url}")
+        elif self._event_data:
+            data = self._event_data.get("data", {})
+            if data:
+                # WS 转换后的格式: data.image.uri
+                if "image" in data and isinstance(data["image"], dict):
+                    url = data["image"].get("uri")
+                # 原始 API 格式: data.image_uri
+                elif "image_uri" in data:
+                    url = data["image_uri"]
+                if url:
+                    _LOGGER.debug(f"使用事件数据URL: {url}")
             
         if not url:
             _LOGGER.warning("没有找到有效的图片URL")
             return None
 
-        image_data = await self._image_cache.get_image(url)
+        domain_data = self.hass.data.get(DOMAIN, {})
+        session = domain_data.get("session")
+        image_data = await self._image_cache.get_image(url, session)
         _LOGGER.info(f"图片获取{'成功' if image_data else '失败'}")
         return image_data
 
@@ -420,19 +427,23 @@ class KiwiLockCamera(Camera):
         try:
             _LOGGER.info(f"更新相机事件数据: {event_data.get('name')}")
             self._event_data = event_data
-            
+
             await self._image_cache.clear_cache()
-            
+
             url = None
-            if (self._event_data and 
-                "data" in self._event_data and 
-                "image" in self._event_data["data"] and 
-                "uri" in self._event_data["data"]["image"]):
-                url = self._event_data["data"]["image"]["uri"]
-                
+            if self._event_data:
+                data = self._event_data.get("data", {})
+                if data:
+                    if "image" in data and isinstance(data["image"], dict):
+                        url = data["image"].get("uri")
+                    elif "image_uri" in data:
+                        url = data["image_uri"]
+
             if url:
                 _LOGGER.debug(f"开始预下载图片: {url}")
-                await self._image_cache.get_image(url)
+                domain_data = self.hass.data.get(DOMAIN, {})
+                session = domain_data.get("session")
+                await self._image_cache.get_image(url, session)
                 _LOGGER.debug("图片预下载完成")
                 
             self.async_write_ha_state()
@@ -467,10 +478,19 @@ class KiwiLockCamera(Camera):
         user_type = lock_user.get("type", "")
         displayed_type = self.USER_TYPE_MAP.get(user_type, user_type)
         
+        # 提取图片 URL（兼容两种格式）
+        image_url = None
+        if data:
+            if "image" in data and isinstance(data["image"], dict):
+                image_url = data["image"].get("uri")
+            elif "image_uri" in data:
+                image_url = data["image_uri"]
+
         return  {
             "level": self._event_data.get("level"),
             "created_at": self._event_data.get("created_at"),
             "用户ID": lock_user.get("id"),
             "开锁类型": displayed_type,
-            "事件时间": self._event_data.get("created_at")
+            "事件时间": self._event_data.get("created_at"),
+            "图片URL": image_url or "无",
         }

@@ -95,10 +95,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.error(f"获取 token 时发生错误: {e}")
         return False
 
-    finally:
-        if connector:
-            connector._cleanup = True
-
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 首先卸载所有平台
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
