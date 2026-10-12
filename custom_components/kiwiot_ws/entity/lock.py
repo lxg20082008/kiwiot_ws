@@ -126,7 +126,7 @@ class KiwiLockStatus(Entity):
 
     @property
     def state(self):
-        _LOGGER.info(f"事件数据: {self._event}")
+        _LOGGER.debug(f"事件数据: {self._event}")
         name = self._event.get("name", "unknown")
         return self._notify_time + " " + self.STATE_MAP.get(name, name)
 
@@ -422,13 +422,13 @@ class KiwiLockCamera(Camera):
         domain_data = self.hass.data.get(DOMAIN, {})
         session = domain_data.get("session")
         image_data = await self._image_cache.get_image(url, session)
-        _LOGGER.info(f"图片获取{'成功' if image_data else '失败'}")
+        _LOGGER.debug(f"图片获取{'成功' if image_data else '失败'}")
         return image_data
 
     async def update_from_event(self, event_data):
         """从新事件更新相机数据."""
         try:
-            _LOGGER.info(f"更新相机事件数据: {event_data.get('name')}")
+            _LOGGER.debug(f"更新相机事件数据: {event_data.get('name')}")
             self._event_data = event_data
 
             await self._image_cache.clear_cache()

@@ -270,7 +270,7 @@ async def handle_websocket_messages(ws, hass, entry):
                 if msg.type == aiohttp.WSMsgType.TEXT:
                     try:
                         data = json.loads(msg.data)
-                        _LOGGER.info(f"接收到消息: {data}")
+                        _LOGGER.debug(f"接收到消息: {data}")
 
                         header = data.get("header", {})
                         if header.get("name") == "CtrlResponse":
