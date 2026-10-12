@@ -119,7 +119,8 @@ async def convert_wsevent_format(event_data: dict) -> dict:
         5: "远程",
         6: "FACE",
         7: "掌纹",
-        9: "临时密码"
+        9: "临时密码",
+        10: "FINGER_VEIN"
     } 
     
     data = event_data.get("data", {})
