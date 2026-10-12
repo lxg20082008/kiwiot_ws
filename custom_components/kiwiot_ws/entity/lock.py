@@ -75,6 +75,7 @@ class KiwiLockStatus(Entity):
         "FACE": "人脸",
         "PASSWORD": "密码",
         "FINGERPRINT": "指纹",
+        "FINGER_VEIN": "指静脉",
         "CARD": "门卡"
     }
     STATE_MAP = {
@@ -170,6 +171,7 @@ class KiwiLockEvent(Entity):
         "FACE": "人脸",
         "PASSWORD": "密码",
         "FINGERPRINT": "指纹",
+        "FINGER_VEIN": "指静脉",
         "CARD": "门卡"
     }
     STATE_MAP = {
@@ -368,6 +370,7 @@ class KiwiLockCamera(Camera):
         "FACE": "人脸",
         "PASSWORD": "密码",
         "FINGERPRINT": "指纹",
+        "FINGER_VEIN": "指静脉",
         "CARD": "门卡"
     }
     STATE_MAP = {

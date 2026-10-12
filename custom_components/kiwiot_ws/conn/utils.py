@@ -192,14 +192,14 @@ class ImageCache:
         self._downloading = False
 
     async def _cleanup_old_cache(self):
-        """清理旧的缓存文件，只保留最近的10个文件"""
-        try:
+        """清理旧的缓存文件，只保留最近的10个文件（在 executor 中执行，避免阻塞事件循环）"""
+        def _cleanup():
             cache_files = sorted(
                 [f for f in self._cache_dir.glob("*.jpg")],
                 key=lambda x: x.stat().st_mtime,
                 reverse=True
             )
-            
+
             if len(cache_files) > self._max_cache_files:
                 for old_file in cache_files[self._max_cache_files:]:
                     try:
@@ -208,6 +208,8 @@ class ImageCache:
                     except Exception as e:
                         _LOGGER.error(f"删除缓存文件失败: {e}")
 
+        try:
+            await self.hass.async_add_executor_job(_cleanup)
         except Exception as e:
             _LOGGER.error(f"清理缓存文件失败: {e}")
 
@@ -226,9 +228,12 @@ class ImageCache:
             return await file.read()
 
     async def clear_cache(self) -> None:
-        if self._current_cache_file and os.path.exists(self._current_cache_file):
+        if self._current_cache_file:
+            def _remove():
+                if os.path.exists(self._current_cache_file):
+                    os.remove(self._current_cache_file)
             try:
-                os.remove(self._current_cache_file)
+                await self.hass.async_add_executor_job(_remove)
                 self._current_image_url = None
                 self._current_cache_file = None
             except Exception as e:

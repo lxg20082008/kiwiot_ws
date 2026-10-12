@@ -4,6 +4,10 @@
 
 为了方便bug反馈，建议使用issue功能进行反馈。或者加qq群(964512589)进行交流。
 
+### v1.1.11 版本更新日志
+- 补全指静脉（FINGER_VEIN）开锁方式映射
+- 修复缓存清理的阻塞文件操作（避免阻塞 HA 事件循环）
+
 ### v1.1.10 版本更新日志
 修复 WebSocket 连接失败的问题
 
@@ -80,6 +84,8 @@ show_entity_picture: true
 1. 在 **远程开锁密码**（`text.xxx_yuan_cheng_kai_suo_mi_ma`）中输入优智云家 APP 的安全密码
 1. 在 **远程开锁数据**（`text.xxx_yuan_cheng_kai_suo_shu_ju`）中填入开锁数据
 1. 点击 **确认开锁**（`button.xxx_que_ren_kai_suo`）按钮执行
+
+> **开锁数据（unlock_data）抓包方法**：电脑网页登录优智云家控制台（`go.kiwik.cn`）→ 按 F12 打开开发者工具 → 在刚登录的网页中操作一次远程开门 → 在 WebSocket 消息里找 `name` 值为 `Ctrl` 的那条，其 payload 末端的 `data` 字段就是开锁数据。
 
 ### 用户别名
 - **用户别名**（`text.xxx_user_x`）实体可直接修改用户显示名称，最长 16 个字符
