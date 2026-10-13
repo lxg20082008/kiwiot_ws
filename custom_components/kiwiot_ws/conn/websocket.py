@@ -330,7 +330,7 @@ async def process_device_event(hass, entry, data):
             payload = await convert_media_event_format(payload)
         else:
             # 将这些"已知但无附加数据"的事件加入白名单，不再报警
-            if event_name in {"LOCK_INDOOR_BUTTON_UNLOCK", "HUMAN_WANDERING"}:
+            if event_name in {"LOCK_INDOOR_BUTTON_UNLOCK", "HUMAN_WANDERING", "LOCK_FINGER_VEIN_FRONZEN", "ACTIVE_MONITOR"}:
                 _LOGGER.debug(f"接收到已知事件（无附加数据）: {event_name}")
             else:
                 _LOGGER.warning(f"未知事件类型: {payload}")

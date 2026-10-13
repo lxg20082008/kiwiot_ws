@@ -180,7 +180,9 @@ class KiwiLockEvent(Entity):
         "LOCK_INDOOR_BUTTON_UNLOCK": "门内按键开锁",
         "LOCK_INDOOR_LEVER_UNLOCK": "门内把手开锁",
         "HUMAN_WANDERING": "有人徘徊",
-        "LOCK_ADD_USER": "添加用户"
+        "LOCK_ADD_USER": "添加用户",
+        "LOCK_FINGER_VEIN_FRONZEN": "指静脉冻结",
+        "ACTIVE_MONITOR": "主动监控"
     }
     def __init__(self, hass, device, event, history_events, users):
         self.hass = hass
@@ -378,7 +380,9 @@ class KiwiLockCamera(Camera):
         "LOCKED": "锁已锁上",
         "LOCK_INDOOR_BUTTON_UNLOCK": "门内按键开锁",
         "HUMAN_WANDERING": "有人徘徊",
-        "LOCK_ADD_USER": "添加用户"
+        "LOCK_ADD_USER": "添加用户",
+        "LOCK_FINGER_VEIN_FRONZEN": "指静脉冻结",
+        "ACTIVE_MONITOR": "主动监控"
     }
 
     def __init__(self, hass, device, event_data, video_info):
