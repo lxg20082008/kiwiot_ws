@@ -97,7 +97,7 @@ class KiwiOTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     def async_get_options_flow(config_entry):
-        return KiwiOTOptionsFlow(config_entry)
+        return KiwiOTOptionsFlow()
 
 
 class KiwiOTOptionsFlow(config_entries.OptionsFlow):
