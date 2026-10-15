@@ -17,7 +17,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """设置配置项"""
     hass.data.setdefault(DOMAIN, {})
 
-    client_id = entry.data.get(CONF_CLIENT_ID)
+    client_id = entry.data.get(CONF_CLIENT_ID) or entry.data.get("X-Kiwik-Client-Id", "")
     ignore_ssl = entry.data.get(CONF_IGNORE_SSL, False)
     token_manager = TokenManager(hass, entry)
     

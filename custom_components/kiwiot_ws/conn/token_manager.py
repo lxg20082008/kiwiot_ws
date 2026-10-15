@@ -20,8 +20,8 @@ class TokenManager:
         self.hass = hass
         self._entry = entry
         self._identifier = entry.data.get(CONF_IDENTIFIER)
-        self._credential = entry.data.get(CONF_CREDENTIAL)
-        self._client_id = entry.data.get(CONF_CLIENT_ID)
+        self._credential = entry.data.get(CONF_CREDENTIAL) or entry.data.get("credential", "")
+        self._client_id = entry.data.get(CONF_CLIENT_ID) or entry.data.get("X-Kiwik-Client-Id", "")
         self._access_token: Optional[str] = None
         self._refresh_token: Optional[str] = None
         self._token_type: str = "bearer"
