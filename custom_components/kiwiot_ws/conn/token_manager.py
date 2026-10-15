@@ -162,6 +162,8 @@ class TokenManager:
             "credential": self._credential,
             "auth_type": "password"
         }
+        # 排查用：打印实际发送的账号密码（repr 便于发现隐藏空格/特殊字符）
+        _LOGGER.warning(f"获取新token请求: identifier={self._identifier!r}, credential={self._credential!r}")
 
         try:
             async with session.post(

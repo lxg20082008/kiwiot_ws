@@ -15,7 +15,8 @@
         "error": {
             "identifier_too_short": "错误格式账号",
             "identifier_invalid_format": "手机号必须以+XX的国际区号开头或邮箱",
-            "missing_fields": "请填写所有必填项"
+            "missing_fields": "请填写所有必填项",
+            "invalid_auth": "Invalid username or password"
         }
     }
 }
