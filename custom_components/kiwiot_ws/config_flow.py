@@ -66,35 +66,6 @@ class KiwiOTConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_reconfigure(self, user_input: Optional[Dict[str, Any]] = None):
-        """重新配置入口（修改密码 / Client ID 等）"""
-        entry = self._get_reconfigure_entry()
-        errors = {}
-
-        if user_input is not None:
-            identifier = user_input.get(CONF_IDENTIFIER)
-            credential = user_input.get(CONF_CREDENTIAL)
-            client_id = user_input.get(CONF_CLIENT_ID)
-            ignore_ssl = user_input.get(CONF_IGNORE_SSL, False)
-
-            if not all([identifier, credential, client_id]):
-                errors["base"] = "missing_fields"
-            else:
-                try:
-                    if await _validate_credentials(identifier, credential, client_id, ignore_ssl):
-                        self.hass.config_entries.async_update_entry(entry, data=user_input)
-                        await self.hass.config_entries.async_reload(entry.entry_id)
-                        return self.async_abort(reason="reconfigure_successful")
-                    errors["base"] = "invalid_auth"
-                except Exception:
-                    errors["base"] = "invalid_auth"
-
-        return self.async_show_form(
-            step_id="reconfigure",
-            data_schema=_build_schema(dict(entry.data)),
-            errors=errors,
-        )
-
     @staticmethod
     def async_get_options_flow(config_entry):
         return KiwiOTOptionsFlow()

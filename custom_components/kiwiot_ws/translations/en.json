@@ -10,17 +10,17 @@
                     "client_secret": "Client ID",
                     "ignore_ssl": "忽略SSL证书验证（不安全）"
                 }
-            },
-            "reconfigure": {
-                "title": "重新配置 KiwiOT",
-                "description": "修改账号密码等配置。",
-                "data": {
-                    "identifier": "手机号（+XX的国际区号开头）或邮箱",
-                    "password": "密码",
-                    "client_secret": "Client ID",
-                    "ignore_ssl": "忽略SSL证书验证（不安全）"
-                }
-            },
+            }
+        },
+        "error": {
+            "identifier_too_short": "错误格式账号",
+            "identifier_invalid_format": "手机号必须以+XX的国际区号开头或邮箱",
+            "missing_fields": "请填写所有必填项",
+            "invalid_auth": "Invalid username or password"
+        }
+    },
+    "options": {
+        "step": {
             "init": {
                 "title": "KiwiOT 选项",
                 "description": "修改账号密码等配置。",
@@ -33,8 +33,6 @@
             }
         },
         "error": {
-            "identifier_too_short": "错误格式账号",
-            "identifier_invalid_format": "手机号必须以+XX的国际区号开头或邮箱",
             "missing_fields": "请填写所有必填项",
             "invalid_auth": "Invalid username or password"
         },
