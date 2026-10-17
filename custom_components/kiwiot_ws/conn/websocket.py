@@ -121,9 +121,15 @@ async def start_websocket_connection(hass, entry, session):
                 # 【核心修复2】每次连接建立后都执行订阅
                 _LOGGER.info("执行设备注册/订阅...")
                 await send_register_request(ws, hass, entry)
+                # 重连后补拉最新事件，弥补断连期间丢的事件
+                if retry_count > 0:
+                    await pull_latest_events(hass, entry, current_session)
 
                 # 连接健康检查任务：每2分钟检查一次
-                async def connection_health_check(ws_conn, hass_instance):
+                async def connection_health_check(ws_conn, hass_instance, entry):
+                    resubscribe_interval = 1800  # 每 30 分钟重新订阅一次，防订阅静默失效
+                    loop = asyncio.get_running_loop()
+                    last_resubscribe = loop.time()
                     while not ws_conn.closed:
                         await asyncio.sleep(120)
                         if ws_conn.closed:
@@ -133,9 +139,14 @@ async def start_websocket_connection(hass, entry, session):
                         if DOMAIN not in hass_instance.data:
                             _LOGGER.warning("健康检查：集成数据已丢失")
                             raise Exception("集成数据丢失")
+                        # 定期重新订阅
+                        if loop.time() - last_resubscribe >= resubscribe_interval:
+                            _LOGGER.info("定期重新订阅设备...")
+                            await send_register_request(ws_conn, hass_instance, entry)
+                            last_resubscribe = loop.time()
                     _LOGGER.debug("健康检查任务结束")
 
-                health_task = asyncio.create_task(connection_health_check(ws, hass))
+                health_task = asyncio.create_task(connection_health_check(ws, hass, entry))
                 tasks = [
                     asyncio.create_task(send_heartbeat(ws)),
                     asyncio.create_task(handle_websocket_messages(ws, hass, entry)),
@@ -340,6 +351,39 @@ async def process_device_event(hass, entry, data):
 
     except Exception as e:
         _LOGGER.error(f"处理设备事件失败: {e}")
+
+async def pull_latest_events(hass, entry, session):
+    """重连后补拉各设备最新事件，弥补断连期间丢的事件"""
+    from .userinfo import get_llock_info
+    from .utils import get_latest_event
+    domain_data = hass.data.get(DOMAIN, {})
+    devices = domain_data.get("devices", {})
+    if not devices:
+        return
+    for device_id in devices:
+        try:
+            events = await get_llock_info(hass, entry, device_id, session)
+            if not events:
+                continue
+            latest = await get_latest_event(events)
+            if not latest:
+                continue
+            name = latest.get("name")
+            level = latest.get("level")
+            event_data = {
+                "did": device_id,
+                "name": name,
+                "level": level,
+                "created_at": latest.get("created_at"),
+                "data": latest.get("data", {}),
+            }
+            if name in {"UNLOCKED", "LOCKED"}:
+                event_data = await convert_wsevent_format(event_data)
+            elif level == "CRITICAL" and name == "REMOTE_UNLOCK":
+                event_data = await convert_media_event_format(event_data)
+            await update_device_state(hass, entry, device_id, event_data)
+        except Exception as e:
+            _LOGGER.error(f"补拉设备 {device_id} 事件失败: {e}")
 
 async def update_device_state(hass, entry, device_id, event_data):
     """根据WebSocket消息更新设备实体状态"""
