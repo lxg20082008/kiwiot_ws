@@ -254,14 +254,44 @@ class KiwiLockEvent(Entity):
         else:    
             return self._notify_time + " " + self.STATE_MAP.get(name, name)
 
+    def _get_welcome_name(self):
+        """计算欢迎词：有括号取括号前、无括号且非空取「主人」、空则空"""
+        name = self._event.get("name", "unknown")
+        data = self._event.get("data", {})
+        lock_user = data.get("lock_user", {})
+        event_type = lock_user.get("type", "unknown")
+        user_id = lock_user.get("id", "unknown")
+
+        alias = None
+        if self._users and isinstance(self._users, list):
+            try:
+                user_id_int = int(user_id) if user_id != "unknown" else -1
+                matching_user = next(
+                    (user for user in self._users
+                     if user.get("type") == event_type
+                     and user.get("number") == user_id_int),
+                    None
+                )
+                if matching_user and matching_user.get("alias"):
+                    alias = matching_user["alias"]
+            except (ValueError, TypeError):
+                pass
+
+        if not alias:
+            return ""
+        if "(" not in alias:
+            return "主人"
+        return alias.split("(")[0]
+
     @property
     def extra_state_attributes(self):
         """返回额外的状态属性"""
 
-        attributes = { 
+        attributes = {
             "更新时间": self._event_time,
             "设备ID": self._device.device_id,
             "类型": self._event.get("level", "unknown"),
+            "欢迎词": self._get_welcome_name(),
             "数据": self._event.get("data", "unknown")
         }
 
