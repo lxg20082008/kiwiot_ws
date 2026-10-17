@@ -1,4 +1,5 @@
 import logging
+import asyncio
 import aiohttp
 from homeassistant.const import Platform
 from homeassistant.config_entries import ConfigEntry
@@ -79,8 +80,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             # 注册平台
             await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
-            # 启动 WebSocket 连接
-            hass.loop.create_task(start_websocket_connection(hass, entry, session))
+            # 启动 WebSocket 连接，保存任务引用以便卸载时停止
+            hass.data[DOMAIN]["ws_task"] = hass.loop.create_task(
+                start_websocket_connection(hass, entry, session)
+            )
 
             _LOGGER.info(f"KiwiOT 集成已成功初始化，添加了 {len(entities_to_add)} 个实体")
             return True
@@ -96,7 +99,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         return False
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    # 首先卸载所有平台
+    # 先停止 WebSocket 连接任务，避免持有实体引用导致删除不彻底
+    ws_task = hass.data.get(DOMAIN, {}).get("ws_task")
+    if ws_task:
+        ws_task.cancel()
+        try:
+            await ws_task
+        except asyncio.CancelledError:
+            pass
+
+    # 卸载所有平台
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     
     if unload_ok:
