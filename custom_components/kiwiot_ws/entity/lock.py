@@ -36,7 +36,7 @@ class KiwiLockDevice:
         """返回设备信息"""
         return DeviceInfo(
             identifiers={(DOMAIN, self.device_id)},
-            name=f"{self.group_name} - {self.name}",
+            name=self.name,
             manufacturer="KiwiOT",
             model="Smart Lock",
             sw_version=self.device_info.get("version", "unknown")
@@ -318,11 +318,12 @@ class KiwiLockUser(TextEntity, RestoreEntity):
         self._attr_native_value = user_info.get("alias", "")
         self._attr_mode = "text"
         self._attr_native_max = 16
+        self._attr_has_entity_name = True
         
     @property
     def name(self):
         """实体名称"""
-        return f"{self._lock_device.name} User {self._user_number}"
+        return f"User {self._user_number}"
 
     @property
     def unique_id(self):
