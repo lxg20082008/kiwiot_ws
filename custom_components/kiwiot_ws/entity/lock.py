@@ -493,11 +493,22 @@ class KiwiLockCamera(Camera):
             elif "image_uri" in data:
                 image_url = data["image_uri"]
 
+        # 事件时间转北京时间（与其他实体保持一致）
+        created_at = self._event_data.get("created_at", "")
+        event_time = created_at
+        try:
+            local_time = datetime.fromisoformat(
+                created_at.replace('Z', '+00:00')
+            ).astimezone(ZoneInfo("Asia/Shanghai"))
+            event_time = local_time.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            pass
+
         return  {
             "level": self._event_data.get("level"),
-            "created_at": self._event_data.get("created_at"),
+            "created_at": event_time,
             "用户ID": lock_user.get("id"),
             "开锁类型": displayed_type,
-            "事件时间": self._event_data.get("created_at"),
+            "事件时间": event_time,
             "图片URL": image_url or "无",
         }
