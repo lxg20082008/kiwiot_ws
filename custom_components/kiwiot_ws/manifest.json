@@ -1,7 +1,7 @@
 {
     "domain": "kiwiot_ws",
     "name": "KiwiOT 优智云家",
-    "version": "v1.1.15",
+    "version": "v1.1.16",
     "documentation": "https://github.com/lxg20082008/kiwiot_ws/tree/main",
     "dependencies": ["camera"],
     "requirements": [
