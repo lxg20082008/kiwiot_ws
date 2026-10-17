@@ -36,9 +36,7 @@ class KiwiLockPasswordInput(TextEntity):
 
     @property
     def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return self._lock_device.get_device_info()
 
     async def async_set_value(self, value: str) -> None:
         """仅保存密码值"""
@@ -110,9 +108,7 @@ class KiwiLockUnlockDataInput(TextEntity):
 
     @property
     def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return self._lock_device.get_device_info()
 
 class KiwiLockPasswordConfirm(ButtonEntity):
     """确认按钮实体"""
@@ -152,9 +148,7 @@ class KiwiLockPasswordConfirm(ButtonEntity):
 
     @property
     def device_info(self):
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return self._lock_device.get_device_info()
 
     @property
     def available(self) -> bool:

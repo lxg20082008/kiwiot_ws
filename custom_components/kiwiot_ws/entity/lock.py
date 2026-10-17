@@ -344,9 +344,7 @@ class KiwiLockUser(TextEntity, RestoreEntity):
     @property
     def device_info(self):
         """设备信息"""
-        return {
-            "identifiers": {(DOMAIN, self._device_id)},
-        }
+        return self._lock_device.get_device_info()
 
     @property
     def state(self):
