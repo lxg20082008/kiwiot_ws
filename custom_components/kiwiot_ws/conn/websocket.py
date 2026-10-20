@@ -163,8 +163,8 @@ async def start_websocket_connection(hass, entry, session):
                     for task in pending:
                         task.cancel()
                         try:
-                            await task
-                        except asyncio.CancelledError:
+                            await asyncio.wait_for(task, timeout=5)
+                        except (asyncio.CancelledError, asyncio.TimeoutError):
                             pass
 
                     for task in done:
@@ -180,7 +180,10 @@ async def start_websocket_connection(hass, entry, session):
                         for task in tasks:
                             if not task.done():
                                 task.cancel()
-                        await asyncio.gather(*tasks, return_exceptions=True)
+                        try:
+                            await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=5)
+                        except asyncio.TimeoutError:
+                            _LOGGER.warning("清理WebSocket子任务超时，继续重连")
                         _LOGGER.debug("所有WebSocket子任务已清理")
 
         except aiohttp.ClientError as e:
