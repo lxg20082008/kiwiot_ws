@@ -128,8 +128,10 @@ async def start_websocket_connection(hass, entry, session):
                 # 连接健康检查任务：每2分钟检查一次
                 async def connection_health_check(ws_conn, hass_instance, entry):
                     resubscribe_interval = 1800  # 每 30 分钟重新订阅一次，防订阅静默失效
+                    reconnect_interval = 14400  # 每 4 小时主动重连一次，防 token 过期后 WebSocket 用旧 token 静默断流
                     loop = asyncio.get_running_loop()
                     last_resubscribe = loop.time()
+                    last_reconnect = loop.time()
                     while not ws_conn.closed:
                         await asyncio.sleep(120)
                         if ws_conn.closed:
@@ -144,6 +146,10 @@ async def start_websocket_connection(hass, entry, session):
                             _LOGGER.info("定期重新订阅设备...")
                             await send_register_request(ws_conn, hass_instance, entry)
                             last_resubscribe = loop.time()
+                        # 定期主动重连，防 token 过期后 WebSocket 静默断流
+                        if loop.time() - last_reconnect >= reconnect_interval:
+                            _LOGGER.warning("定期主动重连 WebSocket（防 token 过期静默断流）")
+                            raise aiohttp.ClientError("定期主动重连")
                     _LOGGER.debug("健康检查任务结束")
 
                 health_task = asyncio.create_task(connection_health_check(ws, hass, entry))
